@@ -1,6 +1,8 @@
 import inspect
+
 from chatgpt_web2api.cdp_driver import CDPDriver
 from chatgpt_web2api.completion_detector import CompletionDetector
+
 
 def test_current_chatgpt_role_selectors_are_supported():
     src = inspect.getsource(CDPDriver) + inspect.getsource(CompletionDetector)
