@@ -454,7 +454,9 @@ class ChatGPTDom:
             rect_raw = await d._js(
                 """(function() {
                   var btn = document.querySelector('button[aria-label*="Send" i]:not([data-testid="stop-button"])')
-                    || document.querySelector('button[data-testid="send-button"]');
+                    || document.querySelector('button[aria-label*="发送" i]:not([data-testid="stop-button"])')
+                    || document.querySelector('button[data-testid="send-button"]')
+                    || document.querySelector('form:has(#prompt-textarea) button[type="submit"], form:has(.ProseMirror) button[type="submit"]');
                   if (!btn) return '';
                   var r = btn.getBoundingClientRect();
                   return JSON.stringify({x:r.left + r.width / 2, y:r.top + r.height / 2});
@@ -495,6 +497,7 @@ class ChatGPTDom:
                     rect_raw = await d._js(
                         """(function() {
                           var btn = document.querySelector('button[aria-label*="Send" i]:not([data-testid="stop-button"])')
+                            || document.querySelector('button[aria-label*="发送" i]:not([data-testid="stop-button"])')
                             || document.querySelector('button[data-testid="send-button"]');
                           if (!btn) return '';
                           var r = btn.getBoundingClientRect();
