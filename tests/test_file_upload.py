@@ -75,8 +75,8 @@ async def test_upload_files_sets_file_input_via_cdp(tmp_path: Path):
     driver._cdp = AsyncMock(
         side_effect=[
             {"result": {"root": {"nodeId": 7}}},
-            {"result": {"nodeId": 11}},
-            {},
+            {"result": {"nodeIds": [11]}},
+            {"result": {"attributes": ["id", "_r_et_", "multiple", ""]}},
             {},
             {},
             {},
@@ -88,9 +88,9 @@ async def test_upload_files_sets_file_input_via_cdp(tmp_path: Path):
     await upload_files_to_composer(driver, [path])
 
     assert driver._cdp.await_args_list[0].args[0] == "DOM.getDocument"
-    assert driver._cdp.await_args_list[1].args[0] == "DOM.querySelector"
-    assert driver._cdp.await_args_list[2].args[0] == "DOM.setFileInputFiles"
-    assert driver._cdp.await_args_list[2].args[1] == {"nodeId": 11, "files": [str(path.resolve())]}
+    assert driver._cdp.await_args_list[1].args[0] == "DOM.querySelectorAll"
+    assert driver._cdp.await_args_list[3].args[0] == "DOM.setFileInputFiles"
+    assert driver._cdp.await_args_list[3].args[1] == {"nodeId": 11, "files": [str(path.resolve())]}
 
 
 @pytest.mark.asyncio
