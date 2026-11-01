@@ -1823,7 +1823,10 @@ class CDPDriver:
             ):
                 yield chunk
 
-            # Wait for URL to become /c/{id}
+            # Wait for URL to become /c/{id} with the server-assigned id.
+            # ChatGPT first navigates to a transient local id
+            # (``local-chatgpt:<uuid>``) which the backend-api rejects with
+            # HTTP 400 — keep polling until the real conversation id appears.
             conv_id = ""
             for _ in range(30):
                 try:
@@ -1832,7 +1835,12 @@ class CDPDriver:
                     await asyncio.sleep(0.5)
                     continue
                 if "/c/" in url:
-                    conv_id = url.split("/c/")[1].split("/")[0].split("?")[0]
+                    raw = url.split("/c/")[1].split("/")[0].split("?")[0]
+                    candidate = urllib.parse.unquote(raw)
+                    if candidate.startswith("local-chatgpt"):
+                        await asyncio.sleep(0.5)
+                        continue
+                    conv_id = candidate
                     break
                 await asyncio.sleep(0.5)
 

@@ -38,6 +38,7 @@ import asyncio
 import json
 import logging
 import time
+import urllib.parse
 
 from .breakers import BreakerKind
 
@@ -221,8 +222,13 @@ class BackendClient:
         """Parse the conversation id from the live tab's ``location.href``.
 
         Returns ``""`` when the URL is not yet a conversation URL (e.g. still
-        on the composer/new-chat page before the first send resolves) or when
-        the JS evaluation fails. Best-effort — callers retry on empty.
+        on the composer/new-chat page before the first send resolves), when
+        the JS evaluation fails, or when the URL still carries ChatGPT's
+        transient local id (``local-chatgpt:<uuid>`` — navigated to within
+        ~1s of send, before the server assigns the real conversation id).
+        The backend-api rejects the transient id with HTTP 400, so it is
+        treated as "not yet available" — callers retry on empty until the
+        real id appears. Best-effort — callers retry on empty.
         """
         from .cdp_driver import CDPJSError
 
@@ -232,7 +238,11 @@ class BackendClient:
             return ""
         if not url or "/c/" not in url:
             return ""
-        return url.split("/c/")[1].split("/")[0].split("?")[0]
+        raw = url.split("/c/")[1].split("/")[0].split("?")[0]
+        conv_id = urllib.parse.unquote(raw)
+        if conv_id.startswith("local-chatgpt"):
+            return ""
+        return conv_id
 
     async def _get_live_conversation_id_best_effort(self) -> str:
         """Resolve the in-flight conversation id by cheapest available source.

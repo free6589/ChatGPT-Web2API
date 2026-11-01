@@ -107,6 +107,32 @@ async def test_conversation_id_from_url_reaches_driver_js_strict():
     assert result == "abc-123"
 
 
+@pytest.mark.asyncio
+async def test_conversation_id_from_url_rejects_transient_local_id():
+    """ChatGPT first navigates to /c/local-chatgpt:<uuid> before the server
+    assigns the real conversation id. The backend-api rejects the transient
+    id with HTTP 400, so the resolver must return "" (not-yet-available)
+    and let callers keep polling until the real id appears."""
+    from urllib.parse import quote
+
+    client, driver = _make_client()
+    transient = "local-chatgpt:ecf8d830-2d61-43fe-b9f3-9ac7123ac6b5"
+    # Raw form (location.href returns the decoded URL).
+    driver._js_strict = AsyncMock(
+        return_value=f"https://chatgpt.com/c/{transient}"
+    )
+    assert await client._conversation_id_from_url() == ""
+    # Percent-encoded form (defensive — some shells/locales keep it encoded).
+    driver._js_strict = AsyncMock(
+        return_value=f"https://chatgpt.com/c/{quote(transient, safe='')}"
+    )
+    assert await client._conversation_id_from_url() == ""
+    # The real id must still resolve.
+    real = "16e7132a-f904-83ec-b7d6-224329e2adc4"
+    driver._js_strict = AsyncMock(return_value=f"https://chatgpt.com/c/{real}")
+    assert await client._conversation_id_from_url() == real
+
+
 # ── 3. Token seam: ensure_token reaches driver._refresh_token ────────
 
 

@@ -477,16 +477,25 @@ class CompletionDetector:
                     "  var msgs = document.querySelectorAll('[data-message-author-role=\"assistant\"], [data-content-search-unit-key$=\":assistant\"], [data-chatgpt-search-unit-key$=\":assistant\"]');"
                     "  if (!msgs.length) return JSON.stringify({text:'', md_text:'', html_len:0, child_count:0, has_action:false, is_thinking:false});"
                     "  var last = msgs[msgs.length - 1];"
-                    # Text: the clean answer lives in ``.markdown`` textContent.
-                    # It's empty during streaming and populates as the turn
-                    # settles — so we ALSO capture ``innerText`` (populated
-                    # during streaming) as a fallback. innerText includes the
-                    # reasoning UI label ("Thinking.../Thought for N seconds"),
-                    # so md_text is captured SEPARATELY and Python prefers it;
-                    # the innerText fallback is trimmed of the leading label.
-                    "  var md = last.querySelector('.markdown');"
+                    # Text: the clean answer lives in the markdown-style answer
+                    # container. Historically ``.markdown``; current ChatGPT
+                    # marks it with a ``MarkdownRoot-*`` class (and a
+                    # ``[data-markdown-text-style]`` wrapper); the reader below
+                    # resolves whichever exists. It's empty during streaming
+                    # and populates as the turn settles — so we ALSO capture
+                    # ``innerText`` (populated during streaming) as a
+                    # fallback. innerText includes the reasoning UI label
+                    # ("Thinking.../Thought for N seconds"), so md_text is
+                    # captured SEPARATELY and Python prefers it; the innerText
+                    # fallback is trimmed of the leading label.
+                    "  var md = last.querySelector('.markdown, [class*=\"MarkdownRoot\"], [data-markdown-text-style]');"
                     "  var mdText = md ? (md.textContent || '') : '';"
                     "  var rawText = (last.innerText || '').trim();"
+                    "  var hEl = last.querySelector('h4[data-conversation-role]');"
+                    "  var hTxt = hEl ? ((hEl.innerText || '').trim()) : '';"
+                    "  if (hTxt && rawText.indexOf(hTxt) === 0) { rawText = rawText.slice(hTxt.length).trim(); }"
+                    "  else if (hTxt && hTxt.indexOf(rawText) === 0 && rawText.length <= hTxt.length + 8) { rawText = ''; }"
+                    "  rawText = rawText.replace(/^(ChatGPT|assistant)\\s*(said|says|\\u8bf4)\\s*[:\\uff1a]?\\s*/i, '');"
                     # Strip a leading "Thinking..." / "Thought for …" reasoning
                     # label so the innerText fallback can't leak it as a delta.
                     "  var text = mdText || rawText.replace(/^Think(ing|\\s+for)[^\\n]*\\n?/i, '');"
@@ -501,10 +510,13 @@ class CompletionDetector:
                     # fix: walk up ancestors, querying down at each scope, and
                     # require the button to be GEOMETRICALLY NEAR the message so
                     # an older turn's action row can't falsely complete a brand-new
-                    # answer. New testid scheme is ``*-turn-action-button``
-                    # (copy/good-response/bad-response); the legacy
-                    # ``response-turn`` selector is retained for older deployments
-                    # but no longer matches anything on current ChatGPT.
+                    # answer. The ``*-turn-action-button`` testid scheme
+                    # (copy/good-response/bad-response) and the legacy
+                    # ``response-turn`` selector are retained for older
+                    # deployments; current ChatGPT renders no data-testid on
+                    # these buttons (Chinese-locale aria-labels: 复制/朗读/分享/
+                    # 重新生成回复…), so the ``.turn-action-controls``
+                    # container and feedback aria-labels are matched too.
                     #
                     # Depth was 4; raised to 8 after issue #12 found the action
                     # row at ancestor depth 6. The geometry window is widened to
@@ -518,7 +530,16 @@ class CompletionDetector:
                     '            [data-testid="bad-response-turn-action-button"],'
                     '            [data-testid*="turn-action-button"],'
                     '            [data-testid*="copy"],'
-                    '            [data-testid*="response-turn"]\';'
+                    '            [data-testid*="response-turn"],'
+                    '            .turn-action-controls button,'
+                    '            button[aria-label*="copy" i],'
+                    '            button[aria-label*="朗读"],'
+                    '            button[aria-label*="read aloud" i],'
+                    '            button[aria-label*="分享"],'
+                    '            button[aria-label*="share" i],'
+                    '            button[aria-label*="重新生成"],'
+                    '            button[aria-label*="regenerate" i],'
+                    '            button[aria-label*="复制"]\';'
                     "  var has_action = (function() {"
                     "    var lastRect = last.getBoundingClientRect();"
                     "    var scope = last;"
